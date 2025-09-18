@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="theme-color" content="#f4f8fa">
+    <title>Fermi Questions - A Wordle-style game</title>
+    <meta name="description" content="A Wordle-style game for Fermi questions. Guess the answer to estimation questions in 6 or less tries.">
+    <link rel="canonical" href="https://www.fermiquestions.org">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script defer data-domain="fermiquestions.org" data-api="https://fermiquestions.daniel-fetz.workers.dev/fermiquestions/event" src="https://fermiquestions.daniel-fetz.workers.dev/fermiquestions/script.hash.js"></script>
+    <!-- Supabase client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+        <header class="game-header">
+            <div class="header-left">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Photograph_of_Enrico_Fermi_-_NARA_-_595043.gif" alt="Enrico Fermi" class="fermi-logo">
+                <h1 class="game-title">
+                    <span>Fermi Questions</span>
+                </h1>
+            </div>
+            <div class="header-right">
+                <button class="nav-button" id="home-btn">Home</button>
+                <button class="nav-button" id="calendar-btn">Calendar</button>
+                <button class="icon-button" id="help-btn">?</button>
+                <button class="icon-button" id="stats-btn">
+                    <svg width="20" height="18" viewBox="0 0 58 51" fill="none" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+                        <rect x="2" y="28" width="8" height="21" fill="#333333"/>
+                        <rect x="19" y="15" width="10" height="34" fill="#333333"/>
+                        <rect x="38" y="2" width="12" height="47" fill="#333333"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+    <main>
+        <section id="welcome-screen" class="view active">
+            <div class="welcome-content">
+                <h2 class="welcome-title">Welcome to Fermi Questions</h2>
+                <p class="welcome-subtitle">Sharpen your estimation skills with a fresh puzzle every day.</p>
+                <div class="daily-challenge-card">
+                    <div class="daily-challenge-header">
+                        <h3>Daily Challenge</h3>
+                        <span id="daily-challenge-date" class="daily-challenge-date"></span>
+                    </div>
+                    <div class="daily-challenge-body">
+                        <div class="daily-challenge-image" id="daily-challenge-image-container" style="display: none;">
+                            <img id="daily-challenge-image" alt="" />
+                        </div>
+                        <div class="daily-challenge-text">
+                            <p id="daily-challenge-question" class="daily-challenge-question"></p>
+                            <p id="daily-challenge-status" class="daily-challenge-status"></p>
+                        </div>
+                    </div>
+                    <button id="play-daily-btn" class="primary-action">Play</button>
+                </div>
+                <button id="calendar-link-btn" class="secondary-action">Browse the calendar</button>
+            </div>
+        </section>
+
+        <section id="game-view" class="view">
+            <div class="game-container">
+        <!-- Question Display -->
+        <div class="question-container">
+            <div class="question-box">
+                <div class="question-content">
+                    <div class="question-image-container" id="question-image-container">
+                        <img class="question-image" id="question-image" alt="" />
+                    </div>
+                    <div class="question-text-container">
+                        <div class="question-text" id="question-text">
+                            How many chickens are slaughtered each year?
+                        </div>
+                        <div class="question-category" id="question-category">
+                            Agriculture
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Inline info shown only after game ends -->
+            <div class="question-meta" id="question-meta" style="display: none;">
+                <button class="meta-item" id="comments-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span id="comment-count">0</span>
+                </button>
+                <button id="source-btn" class="source-btn">Source & Stats <span class="arrow">></span></button>
+            </div>
+        </div>
+
+        <!-- Comments Section -->
+        <div class="comments-section" id="comments-section">
+            <div class="comments-header">
+                <button class="icon-button" id="comments-back-btn">&lt;</button>
+                <h2>Comments</h2>
+            </div>
+            <div class="comments-list" id="comments-list"></div>
+            <div class="comments-input">
+                <textarea id="comment-input" placeholder="Add a comment..."></textarea>
+                <button id="comment-submit-btn" class="submit-btn">Post</button>
+            </div>
+        </div>
+
+        <!-- Questions History Modal -->
+        <div class="modal" id="questions-modal">
+            <div class="modal-content">
+                <h2>Question History</h2>
+                <div class="questions-list" id="questions-list">
+                    <!-- Questions will be populated here -->
+                </div>
+                <button id="close-questions-btn" class="close-btn">Close</button>
+            </div>
+        </div>
+
+        <!-- Guess Counter -->
+        <div class="guess-counter" id="guess-counter">
+            <button id="strategy-tips-btn" class="strategy-link" aria-controls="help-modal" aria-haspopup="dialog">How to Play <span class="arrow">></span></button>
+        </div>
+
+        <!-- Hint (hidden by default) -->
+        <div class="hint-container" id="hint-container" style="display: none;">
+            <button id="hint-modal-btn" class="hint-link" aria-controls="hint-text" aria-expanded="false">Show hint <span class="arrow">></span></button>
+            <div class="hint-text" id="hint-text">
+                <span id="hint-body"></span>
+            </div>
+        </div>
+
+        <!-- Game Result (hidden by default) -->
+        <div class="game-result" id="game-result" style="display: none;">
+            <div class="result-container" id="result-container">
+                <span class="result-emoji" id="result-emoji" aria-hidden="true"></span>
+                <div class="result-text" id="result-text">
+                    <span class="result-message" id="result-message"></span>
+                    <span class="correct-answer" id="correct-answer"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Previous Guesses -->
+        <div class="guesses-container" id="guesses-container">
+            <!-- Guesses will be populated here -->
+        </div>
+
+        <!-- Input Section -->
+        <div class="input-section" id="input-section">
+            <div class="input-row">
+                <div class="input-container">
+                    <input
+                        type="text"
+                        id="guess-input"
+                        placeholder="Enter a guess..."
+                        inputmode="numeric"
+                        pattern="[0-9,]*"
+                    >
+                    <div class="input-actions">
+                        <div class="quick-buttons">
+                            <button type="button" class="quick-btn" data-value="1000000">+1M</button>
+                            <button type="button" class="quick-btn" data-value="1000000000">+1B</button>
+                        </div>
+                        <div class="action-right">
+                            <div class="confidence-wrapper" data-tooltip="How confident are you that your guess is correct?">
+                                <select id="confidence-input">
+                                    <option value="" selected>..%</option>
+                                    <option value="10">10%</option>
+                                    <option value="20">20%</option>
+                                    <option value="30">30%</option>
+                                    <option value="40">40%</option>
+                                    <option value="50">50%</option>
+                                    <option value="60">60%</option>
+                                    <option value="70">70%</option>
+                                    <option value="80">80%</option>
+                                    <option value="90">90%</option>
+                                    <option value="99">99%</option>
+                                </select>
+                                <button id="confidence-button" type="button" aria-haspopup="listbox" aria-expanded="false">..%</button>
+                                <div id="confidence-menu" class="confidence-menu" role="listbox">
+                                    <button type="button" data-value="10" role="option">10%</button>
+                                    <button type="button" data-value="20" role="option">20%</button>
+                                    <button type="button" data-value="30" role="option">30%</button>
+                                    <button type="button" data-value="40" role="option">40%</button>
+                                    <button type="button" data-value="50" role="option">50%</button>
+                                    <button type="button" data-value="60" role="option">60%</button>
+                                    <button type="button" data-value="70" role="option">70%</button>
+                                    <button type="button" data-value="80" role="option">80%</button>
+                                    <button type="button" data-value="90" role="option">90%</button>
+                                    <button type="button" data-value="99" role="option">99%</button>
+                                </div>
+                            </div>
+                            <button id="submit-btn" class="submit-btn">Submit</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Game Button (hidden by default) -->
+        <div class="new-game-section" id="new-game-section" style="display: none;">
+            <button id="share-btn" class="share-btn" style="display: none;">Share</button>
+            <button id="new-game-btn-inline" class="new-game-btn-inline">Play more</button>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div class="modal" id="game-over-modal">
+            <div class="modal-content">
+                <h2 id="modal-title">Game Over!</h2>
+                <p id="modal-message"></p>
+                <p id="modal-answer"></p>
+                <button id="new-game-btn" class="new-game-btn">New Game</button>
+            </div>
+        </div>
+
+        <!-- Help Modal -->
+        <div class="modal" id="help-modal">
+            <div class="modal-content">
+                <h2>How to Play</h2>
+                <div class="accordion" id="help-accordion">
+                    <div class="accordion-item" id="acc-calibration-help-item">
+                        <button class="accordion-header" id="acc-calibration-help-header" aria-expanded="false" aria-controls="acc-calibration-help-panel">
+                            <span>Probability Calibration</span>
+                            <span class="acc-arrow">></span>
+                        </button>
+                        <div class="accordion-panel" id="acc-calibration-help-panel">
+                            <p>When the probability calibration mode is enabled, you are able to log your confidence with each guess and track how well your probabilities match reality.</p>
+                            <p>A calibration chart showing whether you're over- or underconfident is available on the stats page.</p>
+                            <label><input type="checkbox" id="prob-calibration-checkbox-help" class="prob-calibration-checkbox" checked> Enable probability calibration mode</label>
+                        </div>
+                    </div>
+                    <div class="accordion-item" id="acc-strategy-item">
+                        <button class="accordion-header" id="acc-strategy-header" aria-expanded="false" aria-controls="acc-strategy-panel">
+                            <span>Strategy tip</span>
+                            <span class="acc-arrow">></span>
+                        </button>
+                        <div class="accordion-panel" id="acc-strategy-panel">
+                            <p>Make a Fermi estimate: break the problem into simple factors, choose round numbers, then multiply.</p>
+                            <p>Example: How many new cars are sold annually in Japan?</p>
+                            <p>Population a little over 100M -> about 50M households -> roughly 80% own a car -> 40M cars. If cars are replaced about every 10 years, that means roughly 4M new cars sold per year.</p>
+                        </div>
+                    </div>
+                    <div class="accordion-item open" id="acc-overview-item">
+                        <button class="accordion-header" id="acc-overview-header" aria-expanded="true" aria-controls="acc-overview-panel">
+                            <span>Overview</span>
+                            <span class="acc-arrow">></span>
+                        </button>
+                        <div class="accordion-panel" id="acc-overview-panel">
+                            <p>Guess the answer to estimation questions in 6 or less tries.</p>
+                            <p>After each guess, you'll see if your answer was too high or too low. An arrow pointing down means that the correct answer is below your guess.</p>
+                            <p>The color of the arrows shows how close you are: orange indicates your guess is within ±50% of the answer, red means it is further away</p>
+                            <p>You win if your guess is within ±20% of the correct answer.</p>
+                        </div>
+                    </div>
+                </div>
+                <button id="close-help-btn" class="close-btn">Close</button>
+            </div>
+        </div>
+
+
+        <!-- Source/Explanation Modal -->
+        <div class="modal" id="source-modal">
+            <div class="modal-content">
+                <h2>Source & Stats</h2>
+                <div class="accordion" id="source-accordion">
+                    <div class="accordion-item" id="acc-source-item">
+                        <button class="accordion-header" id="acc-source-header" aria-expanded="false" aria-controls="acc-source-panel">
+                            <span>Source</span>
+                            <span class="acc-arrow">></span>
+                        </button>
+                        <div class="accordion-panel" id="acc-source-panel">
+                            <div id="source-text"></div>
+                        </div>
+                    </div>
+                    <div class="accordion-item open" id="acc-stats-item">
+                        <button class="accordion-header" id="acc-stats-header" aria-expanded="true" aria-controls="acc-stats-panel">
+                            <span>Stats</span>
+                            <span class="acc-arrow">></span>
+                        </button>
+                        <div class="accordion-panel" id="acc-stats-panel">
+                            <div class="stats-grid-accordion" id="source-stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-number" id="source-players-count">0</span>
+                                    <span class="stat-label">Players</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number" id="source-win-rate">0%</span>
+                                    <span class="stat-label">Win Rate</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number" id="source-avg-tries">0</span>
+                                    <span class="stat-label">Avg Tries Needed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item open" id="acc-initial-item">
+                        <button class="accordion-header" id="acc-initial-header" aria-expanded="true" aria-controls="acc-initial-panel">
+                            <span>Initial guess</span>
+                            <span class="acc-arrow">></span>
+                        </button>
+                        <div class="accordion-panel" id="acc-initial-panel">
+                            <div id="source-initial" style="margin-top: 0;">
+                                <p id="median-first-guess-text"></p>
+                                <p id="first-guess-percentile-text"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button id="close-source-btn" class="close-btn">Close</button>
+            </div>
+        </div>
+
+        <!-- Stats Modal -->
+        <div class="modal" id="stats-modal">
+            <div class="modal-content">
+                <h2>Statistics</h2>
+                <div class="accordion" id="stats-accordion">
+                    <div class="accordion-item open" id="acc-statsgrid-item">
+                        <button class="accordion-header" id="acc-statsgrid-header" aria-expanded="true" aria-controls="acc-statsgrid-panel">
+                            <span>Stats</span>
+                            <span class="acc-arrow">></span>
+                        </button>
+                        <div class="accordion-panel" id="acc-statsgrid-panel">
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-number" id="games-played">0</span>
+                                    <span class="stat-label">Games Played</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number" id="games-won">0</span>
+                                    <span class="stat-label">Games Won</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number" id="win-rate">0%</span>
+                                    <span class="stat-label">Win Rate</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number" id="current-streak">0</span>
+                                    <span class="stat-label">Current Streak</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number" id="max-streak">0</span>
+                                    <span class="stat-label">Max Streak</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number" id="guess-average">0</span>
+                                    <span class="stat-label">Guess Average</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item" id="acc-distribution-item">
+                        <button class="accordion-header" id="acc-distribution-header" aria-expanded="false" aria-controls="acc-distribution-panel">
+                            <span>Guess Distribution</span>
+                            <span class="acc-arrow">></span>
+                        </button>
+                        <div class="accordion-panel" id="acc-distribution-panel">
+                            <div class="guess-distribution">
+                                <div class="distribution-bars">
+                                    <div class="dist-row">
+                                        <span class="dist-label">1</span>
+                                        <div class="dist-bar-container">
+                                            <div class="dist-bar" id="dist-1" style="width: 0%"></div>
+                                        </div>
+                                        <span class="dist-count" id="count-1">0</span>
+                                    </div>
+                                    <div class="dist-row">
+                                        <span class="dist-label">2</span>
+                                        <div class="dist-bar-container">
+                                            <div class="dist-bar" id="dist-2" style="width: 0%"></div>
+                                        </div>
+                                        <span class="dist-count" id="count-2">0</span>
+                                    </div>
+                                    <div class="dist-row">
+                                        <span class="dist-label">3</span>
+                                        <div class="dist-bar-container">
+                                            <div class="dist-bar" id="dist-3" style="width: 0%"></div>
+                                        </div>
+                                        <span class="dist-count" id="count-3">0</span>
+                                    </div>
+                                    <div class="dist-row">
+                                        <span class="dist-label">4</span>
+                                        <div class="dist-bar-container">
+                                            <div class="dist-bar" id="dist-4" style="width: 0%"></div>
+                                        </div>
+                                        <span class="dist-count" id="count-4">0</span>
+                                    </div>
+                                    <div class="dist-row">
+                                        <span class="dist-label">5</span>
+                                        <div class="dist-bar-container">
+                                            <div class="dist-bar" id="dist-5" style="width: 0%"></div>
+                                        </div>
+                                        <span class="dist-count" id="count-5">0</span>
+                                    </div>
+                                    <div class="dist-row">
+                                        <span class="dist-label">6</span>
+                                        <div class="dist-bar-container">
+                                            <div class="dist-bar" id="dist-6" style="width: 0%"></div>
+                                        </div>
+                                        <span class="dist-count" id="count-6">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item open" id="acc-calibration-item">
+                        <button class="accordion-header" id="acc-calibration-header" aria-expanded="true" aria-controls="acc-calibration-panel">
+                            <span>Probability Calibration</span>
+                            <span class="acc-arrow">></span>
+                        </button>
+                        <div class="accordion-panel" id="acc-calibration-panel">
+                            <div class="calibration-options">
+                                <label>
+                                    <input type="checkbox" id="prob-calibration-checkbox-stats" class="prob-calibration-checkbox" checked> Enable probability calibration mode
+                                </label>
+                                <label>
+                                    <input type="checkbox" id="first-guess-checkbox"> Only count first guesses
+                                </label>
+                            </div>
+                            <p class="calibration-note">No data yet</p>
+                            <div class="calibration-chart-wrapper">
+                                <svg id="calibration-chart" width="300" height="200"></svg>
+                            </div>
+                            <p class="calibration-description">The x-axis shows your declared confidence, and the y-axis shows the actual accuracy. You are perfectly calibrated if you are on the diagonal line.</p>
+                            <div id="calibration-tooltip" class="chart-tooltip"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="share-stats-btn" class="share-btn">Share</button>
+                <button id="close-stats-btn" class="close-btn">Close</button>
+            </div>
+        </div>
+            </div>
+        </section>
+
+        <section id="calendar-view" class="view">
+            <div class="calendar-wrapper">
+                <h2 class="calendar-title">Question Calendar</h2>
+                <p class="calendar-subtitle">Pick a day to play or review its challenge.</p>
+                <div class="calendar-legend">
+                    <span><span class="legend-box pending"></span> Not played</span>
+                    <span><span class="legend-box won"></span> Completed</span>
+                    <span><span class="legend-box lost"></span> Missed</span>
+                </div>
+                <div id="calendar-months" class="calendar-months"></div>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
